@@ -55,12 +55,24 @@ class DBWNode(object):
 
         # TODO: Create `Controller` object
         # self.controller = Controller(<Arguments you wish to provide>)
+        self.current_vel = None
+        self.linear_vel = None
+        self.angular_vel = None
+        self.curr_ang_vek = None
+        self.dbw_enabled = None
+        self.throttle = 0
+        self.brake = 0
+        self.steering = 0
+
 
         # TODO: Subscribe to all the topics you need to
 
         self.loop()
 
     def loop(self):
+
+        # 50hz is best paramter to pass parameters without shutdown the system,
+        # otherwise 
         rate = rospy.Rate(50) # 50Hz
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
@@ -70,9 +82,28 @@ class DBWNode(object):
             #                                                     <current linear velocity>,
             #                                                     <dbw status>,
             #                                                     <any other argument you need>)
-            # if <dbw is enabled>:
-            #   self.publish(throttle, brake, steer)
+
+            # it is come from twist controller 
+            if not None in (self.current_vel, self.linear_vel, self.angular_vel ):
+                throttle, brake, steering = self.controller.control(self.current_vel, 
+                                                                    self.dbw_enabled,
+                                                                    self.linear_vel,
+                                                                    self.angular_vel)
+            if self.dbw_enabled:
+                self.publish(throttle, brake, steering)
+                
+
             rate.sleep()
+
+    def dbw_enabled_cb(self, msg):
+        self.dbw_enabled = msg
+
+    def twist_cb(self, msg):
+        self.linear_vel = msg.twist.linear.x
+        self.angular_vel = msg.twist.angular.x
+    
+    def velocity_cb(self,msg):
+        self.current_vel = msg.twist.linear.x
 
     def publish(self, throttle, brake, steer):
         tcmd = ThrottleCmd()

@@ -2,10 +2,14 @@
 
 import rospy
 from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg import Lane, Waypoint
+from styx_msgs.msg import Lane, Waypoint, TrafficLight
+
+from std_msgs.msg import Int32
+
+from scipy.spatial import KDTree
 
 import math
-
+import numpy as np 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
 
@@ -22,39 +26,138 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-
+MAX_DECEL = .5
 
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
-        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
-        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        # TODO: Add other member variables you need below
+        self.base_lane = None
+        self.pose = None
+        self.stopline_wp_idx = -1
+        self.waypoints_2d = None
+        self.waypoint_tree = None
+        self.base_waypoints = None
+        #self.a = None
+
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-
+        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
+        # gives controller published frequency => 50Hz
+        self.loop()
+    
+    def loop(self):
 
-        rospy.spin()
+        # rate is constant 50Hz 
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            if self.pose and self.base_waypoints:
+
+                self.publish_waypoints_v2()
+                # logging
+                #rospy.logwarn("a teste: {0}".format(self.publish_waypoints_v2()))
+            rate.sleep()
+
+    def get_closet_waypoints_idx(self):
+        x = self.pose.pose.position.x 
+        y = self.pose.pose.position.y 
+        
+        closest_idx = self.waypoints_tree.query( [x,y],1)[1]
+
+        # check if coord is behind car or after car
+        closest_coord = self.waypoints_2d[closest_idx]
+        prev_coord = self.waypoints_2d[closest_idx - 1]
+
+        # equiation for the hyper plane through closest_coord
+        closest_vect = np.array(closest_coord)
+        prev_vect = np.array(prev_coord)
+        xy_vect = np.array( [x,y] )
+
+        val = np.dot(  closest_vect - prev_vect, xy_vect - closest_vect  )
+        
+        # if waypoints is behind us, just +1 on closest_idx 
+        if val > 0:
+            closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
+
+        return closest_idx
+
+    def process_lane(self):
+
+        lane = Lane()
+        closest_idx = self.get_closet_waypoints_idx()
+        endpoint_idx = closest_idx + LOOKAHEAD_WPS # +200 or LOOKAHEAD_WPS 
+        
+        lane.header = self.base_waypoints.header
+        lane.waypoints = self.base_waypoints.waypoints[closest_idx:endpoint_idx]
+        base_waypoints = lane.waypoints
+
+        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= endpoint_idx):
+            lane.waypoints = base_waypoints
+        else:
+            lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
+
+        return lane
+
+    def publish_waypoints_v2(self):
+
+        #
+        # self.process_lane encupsules setting lane.header & lane.waypoints
+         #
+        lane = self.process_lane()
+        self.final_waypoints_pub.publish(lane)
+
+    def publish_waypoints(self, closest_index):
+        
+        lane = Lane()
+        lane.header = self.base_waypoints.header        
+        start_ = closest_index
+        end_ = closest_index + LOOKAHEAD_WPS
+        lane.waypoints = self.base_waypoints.waypoints[start_:end_]
+        self.final_waypoints_pub.publish(lane)
 
     def pose_cb(self, msg):
         # TODO: Implement
-        pass
+        # with 50Hz frequency, data is refleshed.
+        self.pose = msg
+        
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
+        
+        # self.base_waypoints changed everytime reading 
+        # data is chunk size.
+
+        # what is best way to find closest point front of the car ?
+        # There are 200 data points in front of car, then need to find the nearest points
+
+        # we use KDTree which is part of scipy functional method to find the best points effecttively
+        # it is log(n) search..
+
+        self.base_waypoints = waypoints
+        if not self.waypoints_2d:
+            self.waypoints_2d = [ [waypoint.pose.pose.position.x,  waypoint.pose.pose.position.y ] for waypoint in waypoints.waypoints ]
+            self.waypoints_tree = KDTree(  self.waypoints_2d )
+
         pass
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
+
+    #
+    # optional call back velocity
+    #
+    def velocity_cb(self, msg): # geometry_msgs/TwistStamped
+        self.current_velocity = msg.twist
 
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
@@ -69,6 +172,25 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
+
+
+    def decelerate_waypoints(self, waypoints, closest_idx):
+        temp = []
+        for i, wp in enumerate(waypoints):
+
+            p = Waypoint()
+            p.pose = wp.pose
+
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
+            dist = self.distance(waypoints, i, stop_idx)
+            vel = math.sqrt(2 * MAX_DECEL * dist)
+            if vel < 1.:
+                vel = 0.
+
+            p.twist.twist.linear.x = min(vel, wp.twist.twist.linear.x)
+            temp.append(p)
+
+        return temp
 
 
 if __name__ == '__main__':
