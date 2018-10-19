@@ -57,9 +57,9 @@ class WaypointUpdater(object):
         # rate is constant 50Hz 
         rate = rospy.Rate(50)
         while not rospy.is_shutdown():
-            if self.pose and self.base_waypoints:
-
-                self.publish_waypoints_v2()
+            #if self.pose and self.base_waypoints:
+            if self.pose and self.base_lane:
+                self.publish_waypoints()
                 # logging
                 #rospy.logwarn("a teste: {0}".format(self.publish_waypoints_v2()))
             rate.sleep()
@@ -104,6 +104,22 @@ class WaypointUpdater(object):
 
         return lane
 
+    def generate_lane(self):
+        lane = Lane()
+
+        closest_idx = self.get_closet_waypoints_idx()
+        endpoint_idx = closest_idx + LOOKAHEAD_WPS # +200 or LOOKAHEAD_WPS 
+        base_waypoints = self.base_lane.waypoints[closest_idx:endpoint_idx]
+
+        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= endpoint_idx):
+            lane.waypoints = base_waypoints
+        else:
+            lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
+
+        return lane
+
+
+
     def publish_waypoints_v2(self):
 
         #
@@ -112,14 +128,15 @@ class WaypointUpdater(object):
         lane = self.process_lane()
         self.final_waypoints_pub.publish(lane)
 
-    def publish_waypoints(self, closest_index):
+
+    def publish_waypoints(self):
         
-        lane = Lane()
-        lane.header = self.base_waypoints.header        
-        start_ = closest_index
-        end_ = closest_index + LOOKAHEAD_WPS
-        lane.waypoints = self.base_waypoints.waypoints[start_:end_]
-        self.final_waypoints_pub.publish(lane)
+        final_lane = self.generate_lane()
+        #lane.header = self.base_waypoints.header        
+        #start_ = closest_index
+        #end_ = closest_index + LOOKAHEAD_WPS
+        #lane.waypoints = self.base_waypoints.waypoints[start_:end_]
+        self.final_waypoints_pub.publish(final_lane)
 
     def pose_cb(self, msg):
         # TODO: Implement

@@ -37,7 +37,7 @@ class DBWNode(object):
     def __init__(self):
         rospy.init_node('dbw_node')
     	
-        #self.dbw_enabled = True  ## for simulator always True
+        self.dbw_enabled = True  ## for simulator always True
         
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
