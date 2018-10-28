@@ -1,186 +1,136 @@
 #!/usr/bin/env python
 
+import numpy as np
 import rospy
-from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg import Lane, Waypoint, TrafficLight
+from styx_msgs.msg import Lane, Waypoint
+from geometry_msgs.msg import PoseStamped, TwistStamped
+from scipy.spatial import KDTree
 
 from std_msgs.msg import Int32
 
-from scipy.spatial import KDTree
-
 import math
-import numpy as np 
+
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
-
 As mentioned in the doc, you should ideally first implement a version which does not care
 about traffic lights or obstacles.
-
 Once you have created dbw_node, you will update this node to use the status of traffic lights too.
-
 Please note that our simulator also provides the exact location of traffic lights and their
 current status in `/vehicle/traffic_lights` message. You can use this message to build this node
 as well as to verify your TL classifier.
-
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
 MAX_DECEL = .5
 
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
-        # TODO: Add other member variables you need below
         self.base_lane = None
         self.pose = None
         self.stopline_wp_idx = -1
         self.waypoints_2d = None
         self.waypoint_tree = None
         self.base_waypoints = None
-        #self.a = None
+        self.a = None
 
-
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
+     	# Published to final_waypoints
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
-
-        # gives controller published frequency => 50Hz
+        
+        
         self.loop()
+
+    '''
+    def loop(self):
+        rate = rospy.Rate(0.5) # 0.5Hz
+        while not rospy.is_shutdown():
+            if self.pose and self.base_lane: 
+                self.publish_waypoints2()
+                rospy.logwarn("Teste")
+            rate.sleep()
+    '''
+    '''
+    def loop(self):
+        rate = rospy.Rate(0.5) # 0.5Hz
+        while not rospy.is_shutdown():
+            if self.pose and self.base_waypoints: 
+                # Get closest waypoint
+                closest_waypoint_idx = self.get_closest_waypoint_id()
+                self.publish_waypoints(closest_waypoint_idx)
+            rate.sleep()
+    '''
     
     def loop(self):
-
-        # rate is constant 50Hz 
-        rate = rospy.Rate(50)
+        rate = rospy.Rate(20) # 0.5Hz
         while not rospy.is_shutdown():
-            #if self.pose and self.base_waypoints:
-            if self.pose and self.base_lane:
-                self.publish_waypoints()
-                # logging
-                #rospy.logwarn("a teste: {0}".format(self.publish_waypoints_v2()))
+            if self.pose and self.base_waypoints: 
+                # Get closest waypoint                
+                #closest_waypoint_idx = self.get_closest_waypoint_id()
+                self.publish_waypoints2()                
+                #rospy.logwarn("a teste: {0}".format(self.publish_waypoints2()))
             rate.sleep()
+    
 
-    def get_closet_waypoints_idx(self):
-        x = self.pose.pose.position.x 
-        y = self.pose.pose.position.y 
-        
-        closest_idx = self.waypoints_tree.query( [x,y],1)[1]
+    def get_closest_waypoint_id(self):
+        x = self.pose.pose.position.x
+        y = self.pose.pose.position.y
+        closest_idx = self.waypoint_tree.query([x, y], 1)[1]
 
-        # check if coord is behind car or after car
+        # Check if closest is ahead or behind vehicle
         closest_coord = self.waypoints_2d[closest_idx]
-        prev_coord = self.waypoints_2d[closest_idx - 1]
+        prev_coord = self.waypoints_2d[closest_idx-1]
 
-        # equiation for the hyper plane through closest_coord
-        closest_vect = np.array(closest_coord)
+        # Equation for hyperplane through closest_coords
+        cl_vect = np.array(closest_coord)
         prev_vect = np.array(prev_coord)
-        xy_vect = np.array( [x,y] )
+        pos_vect = np.array([x, y])
 
-        val = np.dot(  closest_vect - prev_vect, xy_vect - closest_vect  )
-        
-        # if waypoints is behind us, just +1 on closest_idx 
+        val = np.dot(cl_vect-prev_vect, pos_vect-cl_vect)
+
         if val > 0:
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
-
         return closest_idx
 
-    def process_lane(self):
-
-        lane = Lane()
-        closest_idx = self.get_closet_waypoints_idx()
-        endpoint_idx = closest_idx + LOOKAHEAD_WPS # +200 or LOOKAHEAD_WPS 
-        
-        lane.header = self.base_waypoints.header
-        lane.waypoints = self.base_waypoints.waypoints[closest_idx:endpoint_idx]
-        base_waypoints = lane.waypoints
-
-        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= endpoint_idx):
-            lane.waypoints = base_waypoints
-        else:
-            lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
-
-        return lane
 
     def generate_lane(self):
         lane = Lane()
 
-        closest_idx = self.get_closet_waypoints_idx()
-        endpoint_idx = closest_idx + LOOKAHEAD_WPS # +200 or LOOKAHEAD_WPS 
-        base_waypoints = self.base_lane.waypoints[closest_idx:endpoint_idx]
+        closest_idx = self.get_closest_waypoint_id()
+        farthest_idx = closest_idx + LOOKAHEAD_WPS
+        #base_waypoints = self.base_lane.waypoints[closest_idx:farthest_idx]
+        
 
-        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= endpoint_idx):
+        lane.header = self.base_waypoints.header
+        lane.waypoints = self.base_waypoints.waypoints[closest_idx:farthest_idx]
+        base_waypoints = lane.waypoints
+
+        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
             lane.waypoints = base_waypoints
         else:
             lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
 
         return lane
 
-
-
-    def publish_waypoints_v2(self):
-
-        #
-        # self.process_lane encupsules setting lane.header & lane.waypoints
-         #
-        lane = self.process_lane()
-        self.final_waypoints_pub.publish(lane)
-
-
-    def publish_waypoints(self):
-        
+    def publish_waypoints2(self):
         final_lane = self.generate_lane()
-        #lane.header = self.base_waypoints.header        
-        #start_ = closest_index
-        #end_ = closest_index + LOOKAHEAD_WPS
-        #lane.waypoints = self.base_waypoints.waypoints[start_:end_]
         self.final_waypoints_pub.publish(final_lane)
-
-    def pose_cb(self, msg):
-        # TODO: Implement
-        # with 50Hz frequency, data is refleshed.
-        self.pose = msg
-        
-
-    def waypoints_cb(self, waypoints):
-        
-        # self.base_waypoints changed everytime reading 
-        # data is chunk size.
-
-        # what is best way to find closest point front of the car ?
-        # There are 200 data points in front of car, then need to find the nearest points
-
-        # we use KDTree which is part of scipy functional method to find the best points effecttively
-        # it is log(n) search..
-
-        self.base_waypoints = waypoints
-        if not self.waypoints_2d:
-            self.waypoints_2d = [ [waypoint.pose.pose.position.x,  waypoint.pose.pose.position.y ] for waypoint in waypoints.waypoints ]
-            self.waypoints_tree = KDTree(  self.waypoints_2d )
-
-        pass
-
-    def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
-        self.stopline_wp_idx = msg.data
-
-    def obstacle_cb(self, msg):
-        # TODO: Callback for /obstacle_waypoint message. We will implement it later
-        pass
-
-    #
-    # optional call back velocity
-    #
-    def velocity_cb(self, msg): # geometry_msgs/TwistStamped
-        self.current_velocity = msg.twist
-
-    def get_waypoint_velocity(self, waypoint):
-        return waypoint.twist.twist.linear.x
-
-    def set_waypoint_velocity(self, waypoints, waypoint, velocity):
-        waypoints[waypoint].twist.twist.linear.x = velocity
+        #return final_lane
+    
+    
+    def publish_waypoints(self, closest_idx):
+        lane = Lane()
+        lane.header = self.base_waypoints.header
+        lane.waypoints = self.base_waypoints.waypoints[closest_idx:closest_idx+LOOKAHEAD_WPS]
+        self.final_waypoints_pub.publish(lane)
+     
+    #def distance(self, a, b):
+    #    return ((a.x-b.x)**2 + (a.y-b.y)**2)
 
     def distance(self, waypoints, wp1, wp2):
         dist = 0
@@ -189,7 +139,6 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
-
 
     def decelerate_waypoints(self, waypoints, closest_idx):
         temp = []
@@ -209,6 +158,23 @@ class WaypointUpdater(object):
 
         return temp
 
+    def pose_cb(self, msg):
+    	self.pose = msg
+
+    def waypoints_cb(self, waypoints): 
+        self.base_waypoints = waypoints # just storing
+        if not self.waypoints_2d:
+            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
+            self.waypoint_tree = KDTree(self.waypoints_2d)
+
+    def traffic_cb(self, msg):
+        self.stopline_wp_idx = msg.data
+
+    def get_waypoint_velocity(self, waypoint):
+        return waypoint.twist.twist.linear.x
+
+    def velocity_cb(self, msg): # geometry_msgs/TwistStamped
+        self.current_velocity = msg.twist
 
 if __name__ == '__main__':
     try:

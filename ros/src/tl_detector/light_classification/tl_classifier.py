@@ -16,8 +16,10 @@ class TLClassifier(object):
 
         with self.graph.as_default():
             od_graph_def = tf.GraphDef()
+
             with tf.gfile.GFile(PATH_TO_GRAPH, 'rb') as fid:
-                od_graph_def.ParseFromString(fid.read())
+                serialized_graph = fid.read()
+                od_graph_def.ParseFromString( serialized_graph )
                 tf.import_graph_def(od_graph_def, name='')
 
             self.image_tensor = self.graph.get_tensor_by_name('image_tensor:0')
@@ -26,7 +28,16 @@ class TLClassifier(object):
             self.classes = self.graph.get_tensor_by_name('detection_classes:0')
             self.num_detections = self.graph.get_tensor_by_name('num_detections:0')
 
-            self.sess = tf.Session(graph=self.graph)
+        self.sess = tf.Session(graph=self.graph)
+
+
+    #
+    # discontinued function
+    #
+    def init_classifier(self, model, width, height, channels=3):
+        print("init_classifier / tl_classifer", width)
+        print("init_classifier / tl_classifer", height)
+
 
     def get_classification(self, image):
         """Determines the color of the traffic light in the image
@@ -50,7 +61,7 @@ class TLClassifier(object):
                 feed_dict={self.image_tensor: img_expand})
             end = datetime.now()
             c = end - start
-            print(c.total_seconds())
+            print("detecting total seconds -> ",   c.total_seconds())
 
         boxes = np.squeeze(boxes)
         scores = np.squeeze(scores)
@@ -60,13 +71,13 @@ class TLClassifier(object):
         print('CLASSES: ', classes[0])
 
         if scores[0] > self.threshold:
-            if classes[0] == 1:
+            if classes[0] == 3:
                 print('GREEN')
                 return TrafficLight.GREEN
-            elif classes[0] == 2:
+            elif classes[0] == 1:
                 print('RED')
                 return TrafficLight.RED
-            elif classes[0] == 3:
+            elif classes[0] == 2:
                 print('YELLOW')
                 return TrafficLight.YELLOW
 
