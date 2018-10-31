@@ -6,20 +6,21 @@ import numpy as np
 from datetime import datetime
 
 class TLClassifier(object):
-    def __init__(self):
+    def __init__(self, is_simulation=True):
         #TODO load classifier
 
-        PATH_TO_GRAPH = r'light_classification/model/ssd_sim/sim_frozen_inference_graph.pb'
+        if is_simulation:
+            PATH_TO_GRAPH = r'light_classification/model/ssd_sim/sim_frozen_inference_graph.pb'
+        else:
+            PATH_TO_GRAPH = r'light_classification/model/ssd_real/real_frozen_inference_graph.pb'
 
         self.graph = tf.Graph()
         self.threshold = .5
 
         with self.graph.as_default():
             od_graph_def = tf.GraphDef()
-
             with tf.gfile.GFile(PATH_TO_GRAPH, 'rb') as fid:
-                serialized_graph = fid.read()
-                od_graph_def.ParseFromString( serialized_graph )
+                od_graph_def.ParseFromString(fid.read())
                 tf.import_graph_def(od_graph_def, name='')
 
             self.image_tensor = self.graph.get_tensor_by_name('image_tensor:0')
@@ -28,12 +29,8 @@ class TLClassifier(object):
             self.classes = self.graph.get_tensor_by_name('detection_classes:0')
             self.num_detections = self.graph.get_tensor_by_name('num_detections:0')
 
-        self.sess = tf.Session(graph=self.graph)
+            self.sess = tf.Session(graph=self.graph)
 
-
-    #
-    # discontinued function
-    #
     def init_classifier(self, model, width, height, channels=3):
         print("init_classifier / tl_classifer", width)
         print("init_classifier / tl_classifer", height)
@@ -61,7 +58,7 @@ class TLClassifier(object):
                 feed_dict={self.image_tensor: img_expand})
             end = datetime.now()
             c = end - start
-            print("detecting total seconds -> ",   c.total_seconds())
+            print(c.total_seconds())
 
         boxes = np.squeeze(boxes)
         scores = np.squeeze(scores)
@@ -71,13 +68,13 @@ class TLClassifier(object):
         print('CLASSES: ', classes[0])
 
         if scores[0] > self.threshold:
-            if classes[0] == 3:
+            if classes[0] == 1:
                 print('GREEN')
                 return TrafficLight.GREEN
-            elif classes[0] == 1:
+            elif classes[0] == 2:
                 print('RED')
                 return TrafficLight.RED
-            elif classes[0] == 2:
+            elif classes[0] == 3:
                 print('YELLOW')
                 return TrafficLight.YELLOW
 

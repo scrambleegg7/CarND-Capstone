@@ -23,6 +23,10 @@ class PID(object):
 
         val = self.kp * error + self.ki * integral + self.kd * derivative;
 
+	# antiwindup 
+	if(abs(val)>=0.95*self.max):
+	    self.int_val = 0.0
+
         if val > self.max:
             val = self.max
         elif val < self.min:
