@@ -1,15 +1,24 @@
 ### CapStone Project
 
-This project is coordinated under following hardware/software circumstances.
+### Individual Submission
+
+
+| Full Name | UdaCity Account|
+|-----|----|
+| Hideaki Hamano | rmhmn777@(at)gmail.com|
+
+**This project is coordinated under following hardware/software circumstances.**
 
 1. Ubuntu 16.04 TLS (xenial)
-2. Linux machine X99 processor (16GB MEM 250GB SSD) 
+2. Private Linux machine X99 processor (16GB MEM 250GB SSD) 
 3. NVIDIA GTX1080Ti GPU processor (used for real-time traffic light classification)
 4. ROS Kinetic
 5. tensorflow 1.4.0
 6. tensorflow model library (used for objected detection pretrained model classfication)
 7. ssd_mobilenet_v1_coco_2017_11_17/ssd_inception_v2_2017_11_17
-8. python 2.7
+8. python 2.7.12
+
+---
 
 ## 1. Waypoints updater 
 As first approach to build projected lane, we need to publish a fixed number of waypoints ahead of simlation car running on the rounding street.
