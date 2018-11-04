@@ -70,15 +70,16 @@ Classification..
 GREEN
 
 #### Classified Result Image (offline test by ssd frozen model)
-Green on Simulation
-<img width="500" alt="GreenSim" src="./imgs/classified_image/left0003.jpg" >
-Red on Simulation
-<img width="500" alt="RedSim" src="./imgs/classified_image/left0028red.jpg" >
+[//]: # (References)
+[GreenSim]: ./imgs/classified_image/left0003.jpg 
+[RedSim]: ./imgs/classified_image/left0028red.jpg
+[GreenReal]: ./imgs/classified_image/left0077.jpg
+[RedReal]: ./imgs/classified_image/left0148red.jpg
 
-Green on RealImage
-<img width="500" alt="GreenSim" src="./imgs/classified_image/left0077.jpg" >
-Red on RealImage
-<img width="500" alt="RedSim" src="./imgs/classified_image/left0148red.jpg" >
+<img width="500" title="GreenSimulation" src="./imgs/classified_image/left0003.jpg">
+<img width="500" title="RedSimulation" src="./imgs/classified_image/left0028red.jpg">
+<img width="500" title="GreenReal" src="./imgs/classified_image/left0077.jpg">
+<img width="500" title="RedReal" src="./imgs/classified_image/left0148red.jpg">
 
 *** 
 
