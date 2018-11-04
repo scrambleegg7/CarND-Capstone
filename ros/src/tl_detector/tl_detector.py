@@ -64,8 +64,6 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
-
-
         rospy.spin()
 
 
@@ -154,21 +152,6 @@ class TLDetector(object):
         # tl_state, tf_box = self.light_classifier.get_classification(cv_image)
         tl_state = self.light_classifier.get_classification(cv_image)
 
-        # set rectangle pos and draw rectangle
-        #pos_lup = (tf_box[1], tf_box[0])  #left  x, y
-        #pos_rdwn = (tf_box[3], tf_box[2]) #right x, y
-
-        # set traffic color
-        #color = TL_COLOR_ARRAY[tl_state]
-
-        #cv2.rectangle(cv_image, pos_lup, pos_rdwn, color, 2)
-
-        # display image of front camrera(BGR form. for Opencv)
-        #img_out = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
-        #img_out = cv2.resize(img_out, None, fx=.5, fy=.5)
-        #cv2.imshow("image of front camera", img_out)
-        #cv2.waitKey(1)
-
         return tl_state
 
     def process_traffic_lights(self):
@@ -206,15 +189,9 @@ class TLDetector(object):
 
 
         if light:
-#            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
-#            img_out = cv2.cvtColor(cv_image, cv2.COLOR_RGB2BGR)
-#            img_out = cv2.resize(img_out, None, fx=.5, fy=.5)
-#            cv2.imshow("detected", img_out)
-#            cv2.waitKey(1)
-
 
             light_state = self.get_light_state(light)
-            rospy.loginfo("Traffic Light. Current State: %s", TL_COLOR[light_state])
+            #rospy.loginfo("Traffic Light. Current State: %s", TL_COLOR[light_state])
             return (light_wp, light_state)
 
         return (-1, TrafficLight.UNKNOWN)
