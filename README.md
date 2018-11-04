@@ -11,7 +11,7 @@ This project is coordinated under following hardware/software circumstances.
 7. ssd_mobilenet_v1_coco_2017_11_17/ssd_inception_v2_2017_11_17
 8. python 2.7
 
-##1. Waypoints updater 
+## 1. Waypoints updater 
 As first approach to build projected lane, we need to publish a fixed number of waypoints ahead of simlation car running on the rounding street.
 
 * Object is to find closest waypoint
@@ -46,13 +46,13 @@ min_brake_distance = 0.5 * self.current_velocity_in_mps ** 2 / self.deceleration
 max_brake_distance = 0.5 * self.current_velocity_in_mps ** 2 / self.deceleration_limit_min_in_mps
 ```
 
-##2. DBW (Drive By Wire)
+## 2. DBW (Drive By Wire)
 >DBW is shorten mnemonic name standing on Drive by Wire process, which has central controller (system hub) to bridge software and hardware data process. It gives smooth operation to take action on the physical devices like steering, pedaling and braking etc. Hereby this time our project focus on these 3 top controllers handling, throtling and decelating the car speed. 
 The acceleration is controlled via PID controller. Steering is calculated using YawController which simply calculates needed angle to keep needed velocity.
 
 dbw_node.py / pid.py / thwist_controller.py are implemented. 
 
-##3. Traffic Classification
+## 3. Traffic Classification
 Of the numeraous approaches to find the traffic signal color identifcation, we have selected ssd_inception model from Zoo model libray, which provides the pretrained model library (*ssd_inception_v2_coco_2017_11_17*). The model is trained with 10,000 steps, so that finally extracted the packed libray __sim_frozen_inference_graph.pb__ for simulated traffic image and __real_frozen_inference_graph.ph__ for real udacity traffic image. 
 https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md 
 __A part of tensorflow model library ObjectDetection__ is used to re-train our extracted signal image from simlation and udacity real driving image.
