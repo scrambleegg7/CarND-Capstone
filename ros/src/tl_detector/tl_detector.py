@@ -166,11 +166,11 @@ class TLDetector(object):
         light_wp = None
 
         if self.waypoints is None:
-            rospy.logwarn('no self.waypoints (process_traffic_lights)')
+            rospy.logwarn('no self.waypoints (process_traffic_lights/tl_detector.py)')
             return (-1, TrafficLight.UNKNOWN)
 
         if not self.pose:
-            rospy.logwarn('no self.pose (process_traffic_lights)')
+            rospy.logwarn('no self.pose (process_traffic_lights/tl_detector.py)')
             return (-1, TrafficLight.UNKNOWN)
 
         # List of positions that correspond to the line to stop in front of for a given intersection
